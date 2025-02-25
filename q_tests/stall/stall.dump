@@ -1,0 +1,20 @@
+
+stall:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000200 <_start>:
+ 200:	10000513          	li	a0,256
+ 204:	02a00293          	li	t0,42
+ 208:	00a00313          	li	t1,10
+ 20c:	00552023          	sw	t0,0(a0)
+ 210:	00052383          	lw	t2,0(a0)
+ 214:	00500e13          	li	t3,5
+ 218:	00052e83          	lw	t4,0(a0)
+ 21c:	006e8f33          	add	t5,t4,t1
+ 220:	00100593          	li	a1,1
+ 224:	78059073          	csrw	mtohost,a1
+
+00000228 <infinite>:
+ 228:	0000006f          	j	228 <infinite>
