@@ -9,7 +9,8 @@ case class CoreConfig(
   xlen:       Int,
   makeAlu:    Int => Alu = new AluSimple(_),
   makeBrCond: Int => BrCond = new BrCondSimple(_),
-  makeImmGen: Int => ImmGen = new ImmGenWire(_))
+  makeImmGen: Int => ImmGen = new ImmGenWire(_),
+  makeMDU:    Int => MDU = new MDU(_))
 
 class HostIO(xlen: Int) extends Bundle {
   val fromhost = Flipped(Valid(UInt(xlen.W)))

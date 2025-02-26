@@ -37,6 +37,7 @@ class Datapath(val conf: CoreConfig) extends Module {
   val alu = Module(conf.makeAlu(conf.xlen))
   val immGen = Module(conf.makeImmGen(conf.xlen))
   val brCond = Module(conf.makeBrCond(conf.xlen))
+  val mdu = Module(conf.makeMDU(conf.xlen))
 
   import Control._
 
@@ -130,6 +131,11 @@ class Datapath(val conf: CoreConfig) extends Module {
   alu.io.B := Mux(io.ctrl.B_sel === B_RS2, rs2, immGen.io.out)
   alu.io.alu_op := io.ctrl.alu_op
 
+  // MDU operations
+  mdu.io.A := Mux(io.ctrl.A_sel === A_RS1, rs1, fe_reg.pc)
+  mdu.io.B := Mux(io.ctrl.B_sel === B_RS2, rs2, immGen.io.out)
+  mdu.io.op := io.ctrl.mdu_op
+
   // Branch condition calc
   brCond.io.rs1 := rs1
   brCond.io.rs2 := rs2
@@ -156,7 +162,7 @@ class Datapath(val conf: CoreConfig) extends Module {
   }.elsewhen(!stall && !csr.io.expt) {
     ew_reg.pc := fe_reg.pc
     ew_reg.inst := fe_reg.inst
-    ew_reg.alu := alu.io.out
+    ew_reg.alu := Mux(io.ctrl.mdu_sel, mdu.io.out, alu.io.out)
     ew_reg.csr_in := Mux(io.ctrl.imm_sel === IMM_Z, immGen.io.out, rs1)
     st_type := io.ctrl.st_type
     ld_type := io.ctrl.ld_type
