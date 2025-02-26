@@ -121,7 +121,11 @@ object Control {
     ECALL -> List(PC_4  , A_XXX,  B_XXX, IMM_X, ALU_XXX   , BR_XXX, N, ST_XXX, LD_XXX, WB_CSR, N, CSR.P, N),
     EBREAK-> List(PC_4  , A_XXX,  B_XXX, IMM_X, ALU_XXX   , BR_XXX, N, ST_XXX, LD_XXX, WB_CSR, N, CSR.P, N),
     ERET  -> List(PC_EPC, A_XXX,  B_XXX, IMM_X, ALU_XXX   , BR_XXX, Y, ST_XXX, LD_XXX, WB_CSR, N, CSR.P, N),
-    WFI   -> List(PC_4  , A_XXX,  B_XXX, IMM_X, ALU_XXX   , BR_XXX, N, ST_XXX, LD_XXX, WB_ALU, N, CSR.N, N))
+    WFI   -> List(PC_4  , A_XXX,  B_XXX, IMM_X, ALU_XXX   , BR_XXX, N, ST_XXX, LD_XXX, WB_ALU, N, CSR.N, N),
+    // New Instructions
+    // 添加到Control.scala中的map数组
+    //PC_4: 执行后PC+4 A_RS1: 使用rs1寄存器作为ALU的A输入 B_XXX: 不使用B输入 IMM_X: 不使用立即数 ALU_CLZ/ALU_POPCNT: 指定ALU操作 WB_ALU: 将ALU结果写回rd寄存器 Y: 启用寄存器写回
+    POPCNT-> List(PC_4, A_RS1, B_XXX, IMM_X, ALU_POPCNT, BR_XXX, N, ST_XXX, LD_XXX, WB_ALU, Y, CSR.N, N))
   // format: on
 }
 

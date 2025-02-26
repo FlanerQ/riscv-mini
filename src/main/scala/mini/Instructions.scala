@@ -66,5 +66,8 @@ object Instructions {
   def ERET = BitPat("b00010000000000000000000001110011")
   def WFI = BitPat("b00010000001000000000000001110011")
 
+  // New Instructions
+  def POPCNT = BitPat("b0000010??????????001?????0101011")
+
   def NOP = BitPat.bitPatToUInt(BitPat("b00000000000000000000000000010011"))
 }

@@ -19,6 +19,8 @@ object Alu {
   val ALU_COPY_A = 10.U(4.W)
   val ALU_COPY_B = 11.U(4.W)
   val ALU_XXX = 15.U(4.W)
+  // New ALU operations
+  val ALU_POPCNT = 12.U(4.W)
 }
 
 class AluIO(width: Int) extends Bundle {
@@ -53,7 +55,9 @@ class AluSimple(val width: Int) extends Alu {
       ALU_AND -> (io.A & io.B),
       ALU_OR -> (io.A | io.B),
       ALU_XOR -> (io.A ^ io.B),
-      ALU_COPY_A -> io.A
+      ALU_COPY_A -> io.A,
+      // New ALU operations
+      ALU_POPCNT -> (PopCount(io.A))
     )
   )
 
@@ -89,14 +93,21 @@ class AluArea(val width: Int) extends Alu {
               Mux(
                 io.alu_op === ALU_OR,
                 io.A | io.B,
-                Mux(io.alu_op === ALU_XOR, io.A ^ io.B, Mux(io.alu_op === ALU_COPY_A, io.A, io.B))
+                Mux(
+                  io.alu_op === ALU_XOR,
+                  io.A ^ io.B,
+                  Mux(
+                    io.alu_op === ALU_POPCNT,
+                    PopCount(io.A),
+                    Mux(io.alu_op === ALU_COPY_A, io.A, io.B)
+                  )
+                )
               )
             )
           )
         )
       )
     )
-
   io.out := out
   io.sum := sum
 }
