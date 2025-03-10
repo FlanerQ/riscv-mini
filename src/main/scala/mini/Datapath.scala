@@ -120,8 +120,12 @@ class Datapath(val conf: CoreConfig) extends Module {
 
   // bypass
   val wb_rd_addr = ew_reg.inst(11, 7)
-  val rs1hazard = wb_en && rs1_addr.orR && (rs1_addr === wb_rd_addr)
-  val rs2hazard = wb_en && rs2_addr.orR && (rs2_addr === wb_rd_addr)
+  val rs1hazard = Wire(Bool())
+  val rs2hazard = Wire(Bool())
+
+  rs1hazard := wb_en && rs1_addr.orR && (rs1_addr === wb_rd_addr)
+  rs2hazard := wb_en && rs2_addr.orR && (rs2_addr === wb_rd_addr)
+
   val rs1 = Mux(wb_sel === WB_ALU && rs1hazard, ew_reg.alu, regFile.io.rdata1)
   val rs2 = Mux(wb_sel === WB_ALU && rs2hazard, ew_reg.alu, regFile.io.rdata2)
 
