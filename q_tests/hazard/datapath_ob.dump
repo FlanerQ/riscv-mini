@@ -1,0 +1,14 @@
+
+datapath_ob:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000200 <_start>:
+ 200:	10000513          	li	a0,256
+ 204:	00550293          	addi	t0,a0,5
+ 208:	00100513          	li	a0,1
+ 20c:	78051073          	csrw	mtohost,a0
+
+00000210 <infinite>:
+ 210:	0000006f          	j	210 <infinite>
