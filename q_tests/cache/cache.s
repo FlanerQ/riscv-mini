@@ -7,9 +7,10 @@
 
 .section .text
 .globl _start
-
 _start:
     # 设置：初始化寄存器，选择映射到相同缓存组的地址
+    # - 0x2000 ：0000_0000_0000_0010_0000_0000_0000 (index[11:4]=00, tag = 2)
+    # - 0x3000 ：0000_0000_0000_0011_0000_0000_0000 (index[11:4]=00, tag = 3)
     li x5, 0x2000      # 地址A: 0x2000
     li x6, 0x3000      # 地址B: 0x3000（与A映射到相同缓存组）
 
@@ -38,8 +39,7 @@ _start:
         addi x28, x28, -1
         bnez x28, loop
 
-    li      a0, 1
-    csrw    mtohost, a0
+    csrw    mtohost, 1
 
 infinite:
     j       infinite
