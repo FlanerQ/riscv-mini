@@ -21,6 +21,8 @@ class DatapathIO(xlen: Int) extends Bundle {
 class FetchExecutePipelineRegister(xlen: Int) extends Bundle {
   val inst = chiselTypeOf(Instructions.NOP)
   val pc = UInt(xlen.W)
+  val predicted_taken = Bool()
+  val predicted_target = UInt(xlen.W)
 }
 
 class ExecuteWritebackPipelineRegister(xlen: Int) extends Bundle {
@@ -37,6 +39,7 @@ class Datapath(val conf: CoreConfig) extends Module {
   val alu = Module(conf.makeAlu(conf.xlen))
   val immGen = Module(conf.makeImmGen(conf.xlen))
   val brCond = Module(conf.makeBrCond(conf.xlen))
+  val branchPredictor = Module(new BranchPredictor(conf.xlen, conf.branchPredictorEntries))
 
   import Control._
 
@@ -47,7 +50,9 @@ class Datapath(val conf: CoreConfig) extends Module {
   val fe_reg = RegInit(
     (new FetchExecutePipelineRegister(conf.xlen)).Lit(
       _.inst -> Instructions.NOP,
-      _.pc -> 0.U
+      _.pc -> 0.U,
+      _.predicted_taken -> false.B,
+      _.predicted_target -> 0.U
     )
   )
 
@@ -77,19 +82,34 @@ class Datapath(val conf: CoreConfig) extends Module {
   val started = RegNext(reset.asBool)
   val stall = !io.icache.resp.valid || !io.dcache.resp.valid
   val pc = RegInit(Consts.PC_START.U(conf.xlen.W) - 4.U(conf.xlen.W))
+  
+  // 连接分支预测器的取指接口
+  branchPredictor.io.fetch_pc := pc
+  branchPredictor.io.inst := io.icache.resp.bits.data
+  // 检测分支预测错误
+  val is_branch_inst = io.ctrl.br_type =/= BR_XXX
+  val branch_taken = brCond.io.taken
+  val branch_target = (alu.io.sum >> 1.U << 1.U)
+  val mispredict = is_branch_inst && 
+                  ((branch_taken =/= fe_reg.predicted_taken) || 
+                   (branch_taken && (branch_target =/= fe_reg.predicted_target)))
+
   // Next Program Counter
   val next_pc = MuxCase(
-    pc + 4.U,
+    Mux(branchPredictor.io.predict_taken, branchPredictor.io.predict_target, pc + 4.U),
     IndexedSeq(
       stall -> pc,
       csr.io.expt -> csr.io.evec,
+      mispredict -> Mux(branch_taken, branch_target, fe_reg.pc + 4.U), // 提高优先级，确保预测错误时能及时纠正
       (io.ctrl.pc_sel === PC_EPC) -> csr.io.epc,
-      ((io.ctrl.pc_sel === PC_ALU) || (brCond.io.taken)) -> (alu.io.sum >> 1.U << 1.U),
+      // 只在非分支指令或JAL/JALR类指令时使用PC_ALU，避免与分支预测冲突
+      ((io.ctrl.pc_sel === PC_ALU) && !is_branch_inst) -> branch_target,
       (io.ctrl.pc_sel === PC_0) -> pc
     )
   )
+  // 当处理分支指令时，使用预测结果决定是否插入NOP
   val inst =
-    Mux(started || io.ctrl.inst_kill || brCond.io.taken || csr.io.expt, Instructions.NOP, io.icache.resp.bits.data)
+    Mux(started || io.ctrl.inst_kill || mispredict || csr.io.expt, Instructions.NOP, io.icache.resp.bits.data)
   pc := next_pc
   io.icache.req.bits.addr := next_pc
   io.icache.req.bits.data := 0.U
@@ -101,6 +121,8 @@ class Datapath(val conf: CoreConfig) extends Module {
   when(!stall) {
     fe_reg.pc := pc
     fe_reg.inst := inst
+    fe_reg.predicted_taken := branchPredictor.io.predict_taken
+    fe_reg.predicted_target := branchPredictor.io.predict_target
   }
 
   /** **** Execute ****
@@ -144,6 +166,34 @@ class Datapath(val conf: CoreConfig) extends Module {
   io.dcache.req.bits.mask := MuxLookup(Mux(stall, st_type, io.ctrl.st_type), "b0000".U)(
     Seq(ST_SW -> "b1111".U, ST_SH -> ("b11".U << alu.io.sum(1, 0)), ST_SB -> ("b1".U << alu.io.sum(1, 0)))
   )
+
+  // 添加分支预测性能计数器
+  val hitCounter = RegInit(0.U(32.W)) 
+  val missCounter = RegInit(0.U(32.W))
+  
+  when(is_branch_inst && !stall) {
+    when(fe_reg.predicted_taken === branch_taken && 
+         (!branch_taken || fe_reg.predicted_target === branch_target)) {
+      hitCounter := hitCounter + 1.U
+    }.otherwise {
+      missCounter := missCounter + 1.U
+    }
+  }
+  
+  // 打印分支预测统计信息
+  when(io.host.tohost =/= 0.U) {
+    printf("Branch prediction stats - Hits: %d, Misses: %d, Accuracy: %d%%\n", 
+           hitCounter, missCounter, 
+           (hitCounter * 100.U) / (hitCounter + missCounter + 1.U))
+  }
+  
+  // 连接分支预测器的更新接口
+  branchPredictor.io.exec_pc := fe_reg.pc
+  branchPredictor.io.exec_inst := fe_reg.inst
+  branchPredictor.io.exec_br_type := io.ctrl.br_type
+  branchPredictor.io.exec_taken := branch_taken
+  branchPredictor.io.exec_target := branch_target
+  branchPredictor.io.update := !stall && io.ctrl.br_type =/= BR_XXX
 
   // Pipelining
   when(reset.asBool || !stall && csr.io.expt) {
